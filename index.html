@@ -15,7 +15,381 @@
       --line: #d7dce0;
       --muted: #71808e;
       --purple: #783b99;
+      --pale-blue: #c7e7f5;<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Work Order Execution</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "72", "Segoe UI", Arial, sans-serif;
+      color: #293746;
+      background: #f7f8f9;
+      font-synthesis: none;
+      --blue: #356b88;
+      --line: #d7dce0;
+      --muted: #71808e;
+      --purple: #783b99;
       --pale-blue: #c7e7f5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { margin: 0; min-width: 320px; background: #f7f8f9; }
+
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+
+    .app { min-height: 100vh; display: flex; flex-direction: column; background: #fff; }
+    .toolbar {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .tabs { display: flex; flex: 1 0 auto; }
+    .tab {
+      min-width: 150px;
+      padding: 7px 20px;
+      color: #48677c;
+      background: #fff;
+      border: 1px solid #c8cdd1;
+    }
+    .tab:first-child { border-radius: 4px 0 0 4px; }
+    .tab + .tab { margin-left: -1px; }
+    .tab:last-child { border-radius: 0 4px 4px 0; }
+    .tab.active { color: #fff; background: var(--blue); border-color: var(--blue); }
+    .toolbar-spacer { flex: 1 0 20px; }
+    .tool-button {
+      border: 0;
+      border-radius: 4px;
+      padding: 8px 11px;
+      color: #fff;
+      background: var(--purple);
+      font-weight: 600;
+    }
+    .tool-button.light { color: #536f84; background: #f5e6fb; min-width: 185px; }
+    .tool-button.more { background: transparent; color: #5d6570; }
+
+    .content { flex: 1; display: grid; grid-template-columns: minmax(310px, 28%) 1fr; min-height: 0; }
+    .operations { min-width: 0; padding: 16px 10px 24px 24px; border-right: 2px solid #e1e9ed; }
+    .work-order { padding: 7px 12px 12px 8px; color: #526170; }
+    .check-row { display: flex; align-items: center; gap: 8px; padding: 11px 8px; color: #82909b; background: #edf6fc; }
+    .check-row input { width: 17px; height: 17px; margin: 0; accent-color: var(--blue); }
+    .check-row .row-actions { margin-left: auto; color: #73818e; font-size: 19px; }
+    .operation-head, .operation-row {
+      display: grid;
+      grid-template-columns: minmax(105px, .75fr) minmax(0, 1fr) 50px;
+      align-items: center;
+      gap: 0;
+    }
+    .operation-head { padding: 12px 10px 9px; border-bottom: 1px solid var(--line); font-weight: 600; }
+    .operation-list { overflow: auto; max-height: calc(100vh - 283px); }
+    .operation-row {
+      min-height: 44px;
+      padding: 5px 10px;
+      border-bottom: 1px solid #e0e3e5;
+      color: #536779;
+      cursor: pointer;
+    }
+    .operation-row:hover { background: #f5edf8; }
+    .operation-row.selected, .operation-row.selected:hover { background: #ead9f0; }
+    .operation-row:focus-visible { outline: 2px solid #1768ac; outline-offset: -2px; }
+    .operation-row .number { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .operation-row .description, .operation-head span:nth-child(2) { border-left: 1px solid #e3e7ea; padding-left: 7px; }
+    .operation-row .description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-toggle { width: 18px; height: 24px; flex: 0 0 18px; padding: 0; border: 0; background: transparent; color: #5b8299; font-size: 19px; line-height: 1; }
+    .tree-toggle[aria-expanded="true"] { transform: rotate(90deg); }
+    .tree-toggle:focus-visible { outline: 2px solid #1768ac; outline-offset: 1px; }
+    .tree-spacer { width: 18px; flex: 0 0 18px; }
+    .operation-row.child .number { padding-left: 25px; }
+
+    .execution { min-width: 0; padding: 0 24px 24px 10px; overflow: auto; }
+    .execution-header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 80px;
+      padding: 12px 16px;
+      background: var(--pale-blue);
+    }
+    .operation-title { flex: 1; line-height: 1.55; }
+    .status-area { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 14px; row-gap: 8px; color: #647584; }
+    .status-pill { justify-self: end; padding: 5px 13px; border: 2px solid #e9b738; border-radius: 18px; background: #fff7da; color: #745a12; font-weight: 700; }
+    .date-input { width: 155px; padding: 6px 8px; border: 1px solid #b8c5cc; background: #fff; }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 24px 14px 0; }
+    .status-card {
+      min-height: 142px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 17px 19px;
+      text-align: left;
+      border: 1px solid #d6dadd;
+      border-radius: 5px;
+      background: #fff;
+      color: #283746;
+      box-shadow: 0 1px 2px #0000000c;
+    }
+    .status-card:hover { border-color: #7ba7c0; }
+    .status-card.selected { border-color: var(--tile-color); background: var(--tile-color); color: #fff; box-shadow: none; }
+    .status-card[data-status="C"] { --tile-color: #0788c5; }
+    .status-card[data-status="F"] { --tile-color: #e52227; }
+    .status-card[data-status="I"] { --tile-color: #e17a00; }
+    .status-card[data-status="N"] { --tile-color: #64758e; }
+    .status-card[data-status="P"] { --tile-color: #16a34a; }
+    .status-card[data-status="R"] { --tile-color: #773bea; }
+    .status-letter { font-size: 27px; line-height: 1.15; }
+    .status-label { color: #71808e; }
+    .status-card.selected .status-label { color: #fff; }
+    .status-icon { margin-top: auto; color: #8cb4cf; font-size: 29px; line-height: 1; }
+    .status-card.selected .status-icon { color: #fff; }
+    .long-text { padding: 22px 14px 8px; }
+    .long-text label { display: block; margin-bottom: 10px; color: #687987; font-size: 17px; }
+    .long-text textarea { width: 100%; min-height: 118px; resize: vertical; padding: 8px; border: 1px solid #c8cdd1; }
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 9px 14px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+    .footer button { padding: 7px 12px; border: 0; border-radius: 4px; background: var(--purple); color: #fff; font-weight: 600; }
+    .footer button.primary { background: #1768ac; box-shadow: inset 0 0 0 1px #70b2ed; }
+    .toast {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      z-index: 10;
+      padding: 12px 18px;
+      border-radius: 5px;
+      background: #188918;
+      color: #fff;
+      box-shadow: 0 3px 12px #0003;
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity .2s ease, transform .2s ease;
+      pointer-events: none;
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 900px) {
+      .toolbar { align-items: flex-start; }
+      .tabs .tab { min-width: 120px; padding-inline: 12px; }
+      .content { grid-template-columns: 265px minmax(500px, 1fr); overflow-x: auto; }
+      .footer { justify-content: flex-start; overflow-x: auto; }
+      .footer button { flex: 0 0 auto; }
+    }
+    @media (max-width: 600px) {
+      .toolbar { padding-inline: 10px; }
+      .content { display: flex; flex-direction: column; overflow: visible; }
+      .operations { border-right: 0; border-bottom: 2px solid #e1e9ed; padding: 12px; }
+      .operation-list { max-height: 220px; }
+      .execution { padding: 12px; overflow: visible; }
+      .execution-header { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .status-area { width: 100%; grid-template-columns: auto 1fr; }
+      .status-pill { justify-self: start; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 0 0; gap: 10px; }
+      .status-card { min-height: 120px; padding: 13px; }
+      .long-text { padding: 18px 0 4px; }
+      .footer { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <nav class="toolbar" aria-label="Work order sections and actions">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab">Header Details</button>
+        <button class="tab" role="tab">Operations</button>
+        <button class="tab active" role="tab" aria-selected="true">Execution</button>
+        <button class="tab" role="tab">Spare Parts</button>
+      </div>
+      <span class="toolbar-spacer"></span>
+      <button class="tool-button light">◉ &nbsp;Assessment Forms &nbsp;⌄</button>
+      <button class="tool-button">Equipment Sub Menu</button>
+      <button class="tool-button">Notifications (1)</button>
+      <button class="tool-button">Confirmation List</button>
+      <button class="tool-button more" aria-label="More actions">•••</button>
+    </nav>
+
+    <div class="content">
+      <aside class="operations" aria-label="Work order operations">
+        <div class="work-order">WO Number: &nbsp;<strong>43094291</strong></div>
+        <div class="check-row">
+          <input type="checkbox" aria-label="Show unconfirmed operations">
+          <span>Unconfirmed</span>
+          <span class="row-actions" aria-hidden="true">☷ &nbsp;↟</span>
+        </div>
+        <div class="operation-head" role="row">
+          <span role="columnheader">Operation</span><span role="columnheader">Short Description</span><span role="columnheader">Status</span>
+        </div>
+        <div class="operation-list" role="treegrid" aria-label="Work order operations">
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0010">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="true" aria-label="Collapse operation 0010">›</button>0010</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child selected" role="row" tabindex="0" aria-selected="true" data-parent="0010">
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0010">
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0020</span><span class="description" role="gridcell">test sub-op 2</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0020">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0020">›</button>0020</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0020" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0030">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0030">›</button>0030</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0030" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0040">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0040">›</button>0040</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0040" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0050">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0050">›</button>0050</span><span class="description" role="gridcell">PM OF AIR ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0050" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0060">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0060">›</button>0060</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0060" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0070">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0070">›</button>0070</span><span class="description" role="gridcell">PM OF AIR ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0070" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row" role="row" tabindex="0" aria-selected="false" data-operation="0080">
+            <span class="number" role="gridcell" aria-level="1"><button class="tree-toggle" type="button" aria-expanded="false" aria-label="Expand operation 0080">›</button>0080</span><span class="description" role="gridcell">test main ...</span><span role="gridcell">REL</span>
+          </div>
+          <div class="operation-row child" role="row" tabindex="0" aria-selected="false" data-parent="0080" hidden>
+            <span class="number" role="gridcell" aria-level="2"><span class="tree-spacer"></span>0010</span><span class="description" role="gridcell">test sub-op 1</span><span role="gridcell">REL</span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="execution" aria-label="Operation execution details">
+        <header class="execution-header">
+          <div class="operation-title"><div id="operation-name">Operation : 0010 test main op1</div><div id="sub-operation-name">Sub Operation : 0010 test sub-op 1</div></div>
+          <div class="status-area">
+            <span>Status:</span><span class="status-pill">REL</span>
+            <label for="start-date">Started On:</label><input class="date-input" id="start-date" placeholder="e.g. 31.12.2026, 2..." type="text">
+          </div>
+        </header>
+
+        <div class="cards" role="group" aria-label="Select operation result">
+          <button class="status-card" type="button" data-status="C" aria-pressed="false"><span class="status-letter">C</span><span class="status-label">Complete</span><span class="status-icon">●✓</span></button>
+          <button class="status-card" type="button" data-status="F" aria-pressed="false"><span class="status-letter">F</span><span class="status-label">Fail</span><span class="status-icon">⊗</span></button>
+          <button class="status-card" type="button" data-status="I" aria-pressed="false"><span class="status-letter">I</span><span class="status-label">Intervention</span><span class="status-icon">⚒</span></button>
+          <button class="status-card" type="button" data-status="N" aria-pressed="false"><span class="status-letter">N</span><span class="status-label">N/A</span><span class="status-icon">⊗</span></button>
+          <button class="status-card" type="button" data-status="P" aria-pressed="false"><span class="status-letter">P</span><span class="status-label">Pass</span><span class="status-icon">●✓</span></button>
+          <button class="status-card" type="button" data-status="R" aria-pressed="false"><span class="status-letter">R</span><span class="status-label">Operation needs revision</span><span class="status-icon">▯</span></button>
+        </div>
+
+        <div class="long-text">
+          <label for="operation-notes">Long Text</label>
+          <textarea id="operation-notes">test sub-op 1
+0010 Sub operation 10 long text</textarea>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer" aria-label="Work order actions">
+      <button>Add Task Group</button>
+      <button>Add Notifications</button>
+      <button>Save</button>
+      <button>Save and Exit</button>
+      <button>Print Work Order</button>
+    </footer>
+  </main>
+  <div class="toast" id="submission-toast" role="status" aria-live="polite">Submitted successfully</div>
+  <script>
+    const operationList = document.querySelector(".operation-list");
+    const operationTitle = document.getElementById("operation-name");
+    const subOperationTitle = document.getElementById("sub-operation-name");
+    const operationRows = operationList.querySelectorAll(".operation-row");
+
+    function selectOperation(row) {
+      operationRows.forEach((item) => {
+        const selected = item === row;
+        item.classList.toggle("selected", selected);
+        item.setAttribute("aria-selected", String(selected));
+      });
+
+      const operation = row.dataset.operation || row.dataset.parent;
+      const operationRow = operationList.querySelector(`.operation-row[data-operation="${operation}"]`);
+      operationTitle.textContent = `Operation : ${operation} ${operationRow.querySelector(".description").textContent.trim()}`;
+
+      if (row.dataset.parent) {
+        const subOperation = row.querySelector(".number").textContent.trim();
+        const description = row.querySelector(".description").textContent.trim();
+        subOperationTitle.textContent = `Sub Operation : ${subOperation} ${description}`;
+        subOperationTitle.hidden = false;
+      } else {
+        subOperationTitle.hidden = true;
+      }
+    }
+
+    operationList.addEventListener("click", (event) => {
+      const row = event.target.closest(".operation-row");
+      if (row && !event.target.closest(".tree-toggle")) selectOperation(row);
+    });
+
+    operationList.addEventListener("keydown", (event) => {
+      const row = event.target.closest(".operation-row");
+      if (row && event.target === row && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        selectOperation(row);
+      }
+    });
+
+    document.querySelectorAll(".tree-toggle").forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const expanded = toggle.getAttribute("aria-expanded") === "true";
+        const operation = toggle.closest(".operation-row").dataset.operation;
+        toggle.setAttribute("aria-expanded", String(!expanded));
+        toggle.setAttribute("aria-label", `${expanded ? "Expand" : "Collapse"} operation ${operation}`);
+        const children = document.querySelectorAll(`.operation-row.child[data-parent="${operation}"]`);
+        children.forEach((child) => { child.hidden = expanded; });
+      });
+    });
+    let toastTimer;
+    const submissionToast = document.getElementById("submission-toast");
+    document.querySelectorAll(".status-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".status-card").forEach((item) => {
+          item.classList.remove("selected");
+          item.setAttribute("aria-pressed", "false");
+        });
+        card.classList.add("selected");
+        card.setAttribute("aria-pressed", "true");
+        submissionToast.classList.add("visible");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => submissionToast.classList.remove("visible"), 2500);
+      });
+    });
+  </script>
+</body>
+</html>
+
     }
 
     * { box-sizing: border-box; }
