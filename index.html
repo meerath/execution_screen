@@ -118,7 +118,13 @@
       box-shadow: 0 1px 2px #0000000c;
     }
     .status-card:hover { border-color: #7ba7c0; }
-    .status-card.selected { border: 2px solid #a76500; background: #e98200; color: #fff; box-shadow: inset 0 0 0 1px #b15d00; }
+    .status-card.selected { border-color: var(--tile-color); background: var(--tile-color); color: #fff; box-shadow: none; }
+    .status-card[data-status="C"] { --tile-color: #0788c5; }
+    .status-card[data-status="F"] { --tile-color: #e52227; }
+    .status-card[data-status="I"] { --tile-color: #e17a00; }
+    .status-card[data-status="N"] { --tile-color: #64758e; }
+    .status-card[data-status="P"] { --tile-color: #16a34a; }
+    .status-card[data-status="R"] { --tile-color: #773bea; }
     .status-letter { font-size: 27px; line-height: 1.15; }
     .status-label { color: #71808e; }
     .status-card.selected .status-label { color: #fff; }
@@ -137,6 +143,22 @@
     }
     .footer button { padding: 7px 12px; border: 0; border-radius: 4px; background: var(--purple); color: #fff; font-weight: 600; }
     .footer button.primary { background: #1768ac; box-shadow: inset 0 0 0 1px #70b2ed; }
+    .toast {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      z-index: 10;
+      padding: 12px 18px;
+      border-radius: 5px;
+      background: #188918;
+      color: #fff;
+      box-shadow: 0 3px 12px #0003;
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity .2s ease, transform .2s ease;
+      pointer-events: none;
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 
     @media (max-width: 900px) {
       .toolbar { align-items: flex-start; }
@@ -254,12 +276,12 @@
         </header>
 
         <div class="cards" role="group" aria-label="Select operation result">
-          <button class="status-card"><span class="status-letter">C</span><span class="status-label">Complete</span><span class="status-icon">●✓</span></button>
-          <button class="status-card"><span class="status-letter">F</span><span class="status-label">Fail</span><span class="status-icon">⊗</span></button>
-          <button class="status-card selected"><span class="status-letter">I</span><span class="status-label">Intervention</span><span class="status-icon">⚒</span></button>
-          <button class="status-card"><span class="status-letter">N</span><span class="status-label">N/A</span><span class="status-icon">⊗</span></button>
-          <button class="status-card"><span class="status-letter">P</span><span class="status-label">Pass</span><span class="status-icon">●✓</span></button>
-          <button class="status-card"><span class="status-letter">R</span><span class="status-label">Operation needs revision</span><span class="status-icon">▯</span></button>
+          <button class="status-card" type="button" data-status="C" aria-pressed="false"><span class="status-letter">C</span><span class="status-label">Complete</span><span class="status-icon">●✓</span></button>
+          <button class="status-card" type="button" data-status="F" aria-pressed="false"><span class="status-letter">F</span><span class="status-label">Fail</span><span class="status-icon">⊗</span></button>
+          <button class="status-card" type="button" data-status="I" aria-pressed="false"><span class="status-letter">I</span><span class="status-label">Intervention</span><span class="status-icon">⚒</span></button>
+          <button class="status-card" type="button" data-status="N" aria-pressed="false"><span class="status-letter">N</span><span class="status-label">N/A</span><span class="status-icon">⊗</span></button>
+          <button class="status-card" type="button" data-status="P" aria-pressed="false"><span class="status-letter">P</span><span class="status-label">Pass</span><span class="status-icon">●✓</span></button>
+          <button class="status-card" type="button" data-status="R" aria-pressed="false"><span class="status-letter">R</span><span class="status-label">Operation needs revision</span><span class="status-icon">▯</span></button>
         </div>
 
         <div class="long-text">
@@ -278,6 +300,7 @@
       <button>Print Work Order</button>
     </footer>
   </main>
+  <div class="toast" id="submission-toast" role="status" aria-live="polite">Submitted successfully</div>
   <script>
     document.querySelectorAll(".tree-toggle").forEach((toggle) => {
       toggle.addEventListener("click", () => {
@@ -289,10 +312,19 @@
         children.forEach((child) => { child.hidden = expanded; });
       });
     });
+    let toastTimer;
+    const submissionToast = document.getElementById("submission-toast");
     document.querySelectorAll(".status-card").forEach((card) => {
       card.addEventListener("click", () => {
-        document.querySelectorAll(".status-card").forEach((item) => item.classList.remove("selected"));
+        document.querySelectorAll(".status-card").forEach((item) => {
+          item.classList.remove("selected");
+          item.setAttribute("aria-pressed", "false");
+        });
         card.classList.add("selected");
+        card.setAttribute("aria-pressed", "true");
+        submissionToast.classList.add("visible");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => submissionToast.classList.remove("visible"), 2500);
       });
     });
   </script>
