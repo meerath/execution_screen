@@ -68,7 +68,7 @@
     .check-row .row-actions { margin-left: auto; color: #73818e; font-size: 19px; }
     .operation-head, .operation-row {
       display: grid;
-      grid-template-columns: minmax(105px, .75fr) minmax(0, 1fr) 50px;
+      grid-template-columns: minmax(72px, .42fr) minmax(0, 1fr) 40px;
       align-items: center;
       gap: 0;
     }
@@ -109,9 +109,10 @@
     .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 24px 14px 0; }
     .status-card {
       min-height: 142px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto 1fr;
+      align-items: center;
       padding: 17px 19px;
       text-align: left;
       border: 1px solid #d6dadd;
@@ -128,14 +129,28 @@
     .status-card[data-status="N"] { --tile-color: #64758e; }
     .status-card[data-status="P"] { --tile-color: #16a34a; }
     .status-card[data-status="R"] { --tile-color: #773bea; }
-    .status-letter { font-size: 27px; line-height: 1.15; }
-    .status-label { color: #71808e; }
+    .status-letter { font-size: 56px; font-weight: 700; line-height: 1; }
+    .status-label { grid-column: 1; align-self: start; color: #71808e; font-size: 18px; }
     .status-card.selected .status-label { color: #fff; }
-    .status-icon { margin-top: auto; color: #8cb4cf; font-size: 29px; line-height: 1; }
+    .status-icon { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin-left: 12px; color: #8cb4cf; font-size: 42px; line-height: 1; }
     .status-card.selected .status-icon { color: #fff; }
-    .long-text { padding: 22px 14px 8px; }
+    .long-text-area { display: flex; align-items: stretch; padding: 22px 14px 8px; }
+    .long-text { flex: 0 0 80%; min-width: 0; padding-right: 12px; }
     .long-text label { display: block; margin-bottom: 10px; color: #687987; font-size: 17px; }
     .long-text textarea { width: 100%; min-height: 118px; resize: vertical; padding: 8px; border: 1px solid #c8cdd1; }
+    .operation-navigation { flex: 0 0 20%; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
+    .operation-navigation button { border: 0; background: transparent; color: #111; }
+    .operation-navigation .move-operation { font-size: 36px; line-height: 1; }
+    .operation-navigation .current-operation { font-size: 30px; font-weight: 700; }
+    .operation-navigation button:focus-visible { outline: 2px solid #1768ac; outline-offset: 2px; }
+    .entry-dialog { width: min(440px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 6px; color: #293746; box-shadow: 0 8px 28px #0003; }
+    .entry-dialog::backdrop { background: #17212b80; }
+    .entry-dialog h2 { margin: 0 0 16px; font-size: 20px; }
+    .entry-dialog label { display: block; margin-bottom: 7px; color: #536779; }
+    .entry-dialog textarea { width: 100%; min-height: 100px; resize: vertical; padding: 8px; border: 1px solid #b8c5cc; }
+    .entry-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .entry-dialog-actions button { padding: 8px 12px; border: 0; border-radius: 4px; background: #edf1f4; color: #293746; }
+    .entry-dialog-actions button[type="submit"] { background: var(--blue); color: #fff; }
     .footer {
       display: flex;
       justify-content: flex-end;
@@ -181,7 +196,9 @@
       .status-pill { justify-self: start; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 0 0; gap: 10px; }
       .status-card { min-height: 120px; padding: 13px; }
-      .long-text { padding: 18px 0 4px; }
+      .long-text-area { flex-direction: column; padding: 18px 0 4px; }
+      .long-text { flex-basis: auto; }
+      .operation-navigation { flex: none; flex-direction: row; justify-content: center; gap: 12px; }
       .footer { flex-wrap: wrap; }
     }
   </style>
@@ -287,10 +304,17 @@
           <button class="status-card" type="button" data-status="R" aria-pressed="false"><span class="status-letter">R</span><span class="status-label">Operation needs revision</span><span class="status-icon">▯</span></button>
         </div>
 
-        <div class="long-text">
-          <label for="operation-notes">Long Text</label>
-          <textarea id="operation-notes">test sub-op 1
+        <div class="long-text-area">
+          <div class="long-text">
+            <label for="operation-notes">Long Text</label>
+            <textarea id="operation-notes">test sub-op 1
 0010 Sub operation 10 long text</textarea>
+          </div>
+          <nav class="operation-navigation" aria-label="Operation navigation">
+            <button class="move-operation" id="previous-operation" type="button" aria-label="Previous operation">▲</button>
+            <button class="current-operation" id="jump-to-operation" type="button" aria-label="Jump to operation 0010">0010</button>
+            <button class="move-operation" id="next-operation" type="button" aria-label="Next operation">▼</button>
+          </nav>
         </div>
       </section>
     </div>
@@ -303,12 +327,54 @@
       <button>Print Work Order</button>
     </footer>
   </main>
+  <dialog class="entry-dialog" id="entry-dialog" aria-labelledby="entry-dialog-title">
+    <form id="entry-form">
+      <h2 id="entry-dialog-title"></h2>
+      <label id="entry-label" for="entry-value"></label>
+      <textarea id="entry-value" required></textarea>
+      <div class="entry-dialog-actions">
+        <button id="cancel-entry" type="button">Cancel</button>
+        <button type="submit">Continue</button>
+      </div>
+    </form>
+  </dialog>
   <div class="toast" id="submission-toast" role="status" aria-live="polite">Submitted successfully</div>
   <script>
     const operationList = document.querySelector(".operation-list");
     const operationTitle = document.getElementById("operation-name");
     const subOperationTitle = document.getElementById("sub-operation-name");
     const operationRows = operationList.querySelectorAll(".operation-row");
+    const operationNotes = document.getElementById("operation-notes");
+    const currentOperationButton = document.getElementById("jump-to-operation");
+    const entryDialog = document.getElementById("entry-dialog");
+    const entryForm = document.getElementById("entry-form");
+    const entryTitle = document.getElementById("entry-dialog-title");
+    const entryLabel = document.getElementById("entry-label");
+    const entryValue = document.getElementById("entry-value");
+    const submissionToast = document.getElementById("submission-toast");
+    let toastTimer;
+    let entryPurpose = null;
+    let pendingStatusCard = null;
+
+    function showToast(message) {
+      submissionToast.textContent = message;
+      submissionToast.classList.add("visible");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => {
+        submissionToast.classList.remove("visible");
+        submissionToast.textContent = "Submitted successfully";
+      }, 2500);
+    }
+
+    function openEntryDialog(purpose, title, label) {
+      entryPurpose = purpose;
+      entryTitle.textContent = title;
+      entryLabel.textContent = label;
+      entryValue.value = "";
+      entryValue.placeholder = purpose === "jump" ? "0020 or 0010-0020" : "";
+      entryDialog.showModal();
+      entryValue.focus();
+    }
 
     function selectOperation(row) {
       operationRows.forEach((item) => {
@@ -326,8 +392,12 @@
         const description = row.querySelector(".description").textContent.trim();
         subOperationTitle.textContent = `Sub Operation : ${subOperation} ${description}`;
         subOperationTitle.hidden = false;
+        currentOperationButton.textContent = `${operation}-${subOperation}`;
+        currentOperationButton.setAttribute("aria-label", `Jump to operation ${operation}, sub-operation ${subOperation}`);
       } else {
         subOperationTitle.hidden = true;
+        currentOperationButton.textContent = operation;
+        currentOperationButton.setAttribute("aria-label", `Jump to operation ${operation}`);
       }
     }
 
@@ -344,6 +414,81 @@
       }
     });
 
+    function moveOperation(direction) {
+      const visibleRows = Array.from(operationRows).filter((row) => !row.hidden);
+      const selectedIndex = visibleRows.findIndex((row) => row.classList.contains("selected"));
+      const nextIndex = Math.max(0, Math.min(visibleRows.length - 1, selectedIndex + direction));
+      const row = visibleRows[nextIndex];
+      if (row) {
+        selectOperation(row);
+        row.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    document.getElementById("previous-operation").addEventListener("click", () => moveOperation(-1));
+    document.getElementById("next-operation").addEventListener("click", () => moveOperation(1));
+    currentOperationButton.addEventListener("click", () => {
+      openEntryDialog("jump", "Jump to operation", "Enter an operation number or operation-sub-operation (e.g. 0010-0020)");
+    });
+
+    document.getElementById("cancel-entry").addEventListener("click", () => {
+      entryPurpose = null;
+      pendingStatusCard = null;
+      entryDialog.close();
+    });
+    entryDialog.addEventListener("cancel", () => {
+      entryPurpose = null;
+      pendingStatusCard = null;
+    });
+    entryValue.addEventListener("input", () => entryValue.setCustomValidity(""));
+    entryForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!entryValue.value.trim()) {
+        entryValue.setCustomValidity("Enter a value to continue.");
+        entryValue.reportValidity();
+        return;
+      }
+
+      entryValue.setCustomValidity("");
+      const purpose = entryPurpose;
+      const value = entryValue.value.trim();
+      entryDialog.close();
+      if (purpose === "jump") {
+        const subOperationMatch = value.match(/^(\d{4})\s*-\s*(\d{4})$/);
+        let target;
+        if (subOperationMatch) {
+          const [, operation, subOperation] = subOperationMatch;
+          const parentRow = Array.from(operationRows).find((row) => row.dataset.operation === operation);
+          target = Array.from(operationRows).find((row) =>
+            row.dataset.parent === operation && row.querySelector(".number").textContent.trim() === subOperation
+          );
+          if (target && parentRow) {
+            const toggle = parentRow.querySelector(".tree-toggle");
+            if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
+          }
+        } else {
+          target = Array.from(operationRows).find((row) => row.dataset.operation === value);
+        }
+
+        if (target) {
+          selectOperation(target);
+          target.scrollIntoView({ block: "nearest" });
+        } else {
+          showToast(`Operation ${value} was not found`);
+        }
+      } else if (purpose === "status" && pendingStatusCard) {
+        const label = pendingStatusCard.querySelector(".status-label").textContent.trim();
+        const entry = `${label} confirmation: ${value}`;
+        operationNotes.value = operationNotes.value.trim()
+          ? `${operationNotes.value.trim()}\n${entry}`
+          : entry;
+        selectStatusCard(pendingStatusCard);
+      }
+
+      entryPurpose = null;
+      pendingStatusCard = null;
+    });
+
     document.querySelectorAll(".tree-toggle").forEach((toggle) => {
       toggle.addEventListener("click", () => {
         const expanded = toggle.getAttribute("aria-expanded") === "true";
@@ -354,19 +499,27 @@
         children.forEach((child) => { child.hidden = expanded; });
       });
     });
-    let toastTimer;
-    const submissionToast = document.getElementById("submission-toast");
+
+    function selectStatusCard(card) {
+      document.querySelectorAll(".status-card").forEach((item) => {
+        item.classList.remove("selected");
+        item.setAttribute("aria-pressed", "false");
+      });
+      card.classList.add("selected");
+      card.setAttribute("aria-pressed", "true");
+      showToast("Submitted successfully");
+    }
+
     document.querySelectorAll(".status-card").forEach((card) => {
       card.addEventListener("click", () => {
-        document.querySelectorAll(".status-card").forEach((item) => {
-          item.classList.remove("selected");
-          item.setAttribute("aria-pressed", "false");
-        });
-        card.classList.add("selected");
-        card.setAttribute("aria-pressed", "true");
-        submissionToast.classList.add("visible");
-        window.clearTimeout(toastTimer);
-        toastTimer = window.setTimeout(() => submissionToast.classList.remove("visible"), 2500);
+        if (card.dataset.status === "F" || card.dataset.status === "I") {
+          const label = card.querySelector(".status-label").textContent.trim();
+          pendingStatusCard = card;
+          openEntryDialog("status", `${label} confirmation`, "Enter confirmation details");
+          return;
+        }
+
+        selectStatusCard(card);
       });
     });
   </script>
