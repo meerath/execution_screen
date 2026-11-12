@@ -143,11 +143,31 @@
     .operation-navigation .move-operation { font-size: 36px; line-height: 1; }
     .operation-navigation .current-operation { font-size: 30px; font-weight: 700; }
     .operation-navigation button:focus-visible { outline: 2px solid #1768ac; outline-offset: 2px; }
-    .entry-dialog { width: min(440px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line); border-radius: 6px; color: #293746; box-shadow: 0 8px 28px #0003; }
+    .entry-dialog {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      width: min(616px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      margin: 0 auto;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #293746;
+      box-shadow: 0 8px 28px #0003;
+    }
     .entry-dialog::backdrop { background: #17212b80; }
     .entry-dialog h2 { margin: 0 0 16px; font-size: 20px; }
     .entry-dialog label { display: block; margin-bottom: 7px; color: #536779; }
     .entry-dialog textarea { width: 100%; min-height: 100px; resize: vertical; padding: 8px; border: 1px solid #b8c5cc; }
+    .confirmation-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+    .confirmation-tools[hidden] { display: none; }
+    .timestamp-field { min-width: 0; }
+    .timestamp-field label { display: block; margin-bottom: 5px; font-size: 13px; }
+    .timestamp-field input { width: 100%; min-width: 0; min-height: 38px; padding: 6px 8px; border: 1px solid #b8c5cc; border-radius: 4px; background: #fff; color: #293746; }
+    .timestamp-summary { grid-column: 1 / -1; margin: 0; color: #536779; font-size: 13px; overflow-wrap: anywhere; }
     .entry-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
     .entry-dialog-actions button { padding: 8px 12px; border: 0; border-radius: 4px; background: #edf1f4; color: #293746; }
     .entry-dialog-actions button[type="submit"] { background: var(--blue); color: #fff; }
@@ -332,9 +352,21 @@
       <h2 id="entry-dialog-title"></h2>
       <label id="entry-label" for="entry-value"></label>
       <textarea id="entry-value" required></textarea>
+      <div class="confirmation-tools" id="confirmation-tools" hidden>
+        <div class="timestamp-field">
+          <label for="start-timestamp">Start timestamp</label>
+          <input id="start-timestamp" type="datetime-local">
+        </div>
+        <div class="timestamp-field">
+          <label for="end-timestamp">End timestamp</label>
+          <input id="end-timestamp" type="datetime-local">
+        </div>
+        <p class="timestamp-summary" id="timestamp-summary" aria-live="polite"></p>
+      </div>
       <div class="entry-dialog-actions">
         <button id="cancel-entry" type="button">Cancel</button>
-        <button type="submit">Continue</button>
+        <button type="submit" id="confirmation-submit" value="confirmation">Continue</button>
+        <button type="submit" id="final-confirmation-submit" value="final-confirmation" hidden>Final Confirmation</button>
       </div>
     </form>
   </dialog>
@@ -351,10 +383,17 @@
     const entryTitle = document.getElementById("entry-dialog-title");
     const entryLabel = document.getElementById("entry-label");
     const entryValue = document.getElementById("entry-value");
+    const confirmationTools = document.getElementById("confirmation-tools");
+    const timestampSummary = document.getElementById("timestamp-summary");
+    const confirmationSubmit = document.getElementById("confirmation-submit");
+    const finalConfirmationSubmit = document.getElementById("final-confirmation-submit");
     const submissionToast = document.getElementById("submission-toast");
     let toastTimer;
     let entryPurpose = null;
     let pendingStatusCard = null;
+    let startTimestamp = null;
+    let endTimestamp = null;
+    let labourDuration = null;
 
     function showToast(message) {
       submissionToast.textContent = message;
@@ -372,8 +411,37 @@
       entryLabel.textContent = label;
       entryValue.value = "";
       entryValue.placeholder = purpose === "jump" ? "0020 or 0010-0020" : "";
+      confirmationTools.hidden = purpose !== "status";
+      confirmationSubmit.hidden = false;
+      confirmationSubmit.textContent = purpose === "status" ? "Confirmation" : "Continue";
+      finalConfirmationSubmit.hidden = purpose !== "status";
+      const startInput = document.getElementById("start-timestamp");
+      const endInput = document.getElementById("end-timestamp");
+      startInput.value = "";
+      endInput.value = "";
+      endInput.removeAttribute("min");
+      startTimestamp = null;
+      endTimestamp = null;
+      labourDuration = null;
+      timestampSummary.textContent = "";
       entryDialog.showModal();
+      updateEntryDialogViewport();
       entryValue.focus();
+    }
+
+    function updateEntryDialogViewport() {
+      if (!entryDialog.open) return;
+      const viewport = window.visualViewport;
+      const visibleHeight = viewport ? Math.min(viewport.height, window.innerHeight) : window.innerHeight;
+      const viewportTop = viewport ? viewport.offsetTop : 0;
+      entryDialog.style.top = `${viewportTop + 16}px`;
+      entryDialog.style.maxHeight = `${Math.max(120, visibleHeight - 32)}px`;
+    }
+
+    window.addEventListener("resize", updateEntryDialogViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", updateEntryDialogViewport);
+      window.visualViewport.addEventListener("scroll", updateEntryDialogViewport);
     }
 
     function selectOperation(row) {
@@ -441,6 +509,55 @@
       pendingStatusCard = null;
     });
     entryValue.addEventListener("input", () => entryValue.setCustomValidity(""));
+    function formatTimestamp(date) {
+      return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    function updateTimestampSummary(message = "") {
+      timestampSummary.textContent = labourDuration !== null
+        ? `Labour: ${labourDuration}`
+        : message;
+    }
+
+    function syncTimestampsFromPickers() {
+      const startInput = document.getElementById("start-timestamp");
+      const endInput = document.getElementById("end-timestamp");
+      startTimestamp = startInput.value ? new Date(startInput.value) : null;
+      endTimestamp = endInput.value ? new Date(endInput.value) : null;
+      labourDuration = null;
+
+      if (startTimestamp) {
+        document.getElementById("start-date").value = formatTimestamp(startTimestamp);
+        endInput.min = startInput.value;
+      } else {
+        endInput.removeAttribute("min");
+      }
+
+      const message = endTimestamp ? calculateLabourDuration() : "";
+      updateTimestampSummary(message);
+    }
+
+    function calculateLabourDuration() {
+      if (!startTimestamp || !endTimestamp) {
+        labourDuration = null;
+        return "Set both timestamps to calculate labour.";
+      }
+
+      const elapsedMinutes = Math.round((endTimestamp - startTimestamp) / 60000);
+      if (elapsedMinutes < 0) {
+        labourDuration = null;
+        return "End timestamp is earlier than start.";
+      }
+
+      const hours = Math.floor(elapsedMinutes / 60);
+      const minutes = elapsedMinutes % 60;
+      labourDuration = `${hours}h ${minutes}m`;
+      return "";
+    }
+
+    document.getElementById("start-timestamp").addEventListener("change", syncTimestampsFromPickers);
+    document.getElementById("end-timestamp").addEventListener("change", syncTimestampsFromPickers);
+
     entryForm.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!entryValue.value.trim()) {
@@ -478,7 +595,14 @@
         }
       } else if (purpose === "status" && pendingStatusCard) {
         const label = pendingStatusCard.querySelector(".status-label").textContent.trim();
-        const entry = `${label} confirmation: ${value}`;
+        const confirmationType = event.submitter.value === "final-confirmation"
+          ? "Final Confirmation"
+          : "Confirmation";
+        const details = [`${label} ${confirmationType}: ${value}`];
+        if (startTimestamp) details.push(`Start timestamp: ${formatTimestamp(startTimestamp)}`);
+        if (endTimestamp) details.push(`End timestamp: ${formatTimestamp(endTimestamp)}`);
+        if (labourDuration !== null) details.push(`Labour: ${labourDuration}`);
+        const entry = details.join("\n");
         operationNotes.value = operationNotes.value.trim()
           ? `${operationNotes.value.trim()}\n${entry}`
           : entry;
